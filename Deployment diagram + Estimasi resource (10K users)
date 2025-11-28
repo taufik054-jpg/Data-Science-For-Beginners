@@ -1,0 +1,44 @@
+@startuml
+node "Load Balancer (LB) - public" as LB
+
+node "Kubernetes Cluster (App Tier) - Private" as K8S {
+  component "Ingress Controller / API Gateway\n(3 replicas)" as AG
+  component "Web Frontend (React) - static on CDN" as FE
+  component "App Services (microservices) - autoscaled\n(course, quiz, enrollment, user, media)\n(3 replicas each baseline; HPA to 6)" as APP
+  component "Workers (background) - queue consumers\n(2 baseline; HPA to 6)" as WORKERS
+  component "Redis Cache Cluster\n(3 node cluster, 4 vCPU / 8 GB each)" as REDIS
+}
+
+node "Database Tier" as DB {
+  component "Primary RDBMS (Postgres)\n8 vCPU / 32 GB RAM, 500 GB NVMe\n(HA pair + async replicas)" as PG_PRIMARY
+  component "Read Replicas x2\n(8 vCPU / 32 GB, 500 GB)" as PG_REPLICA
+  component "Time-series / Metrics DB (Prometheus)" as METRICS
+}
+
+node "Object Storage + CDN" as STORAGE {
+  component "Object Storage (videos, PDFs)\nS3-compatible, start 2 TB" as OBJ
+  component "CDN (edge caching for media + static)" as CDN
+}
+
+node "Message Bus / Event Streaming" as MQ {
+  component "Kafka / PubSub Cluster\n(3 brokers baseline)" as KAFKA
+}
+
+node "Monitoring & Logging" as MON {
+  component "ELK / EFK (Elasticsearch 3 nodes)\n(3 x 8vCPU/32GB)" as ELK
+  component "Grafana + Prometheus" as GRAF
+}
+
+LB --> AG
+AG --> APP
+APP --> REDIS
+APP --> PG_PRIMARY
+APP --> PG_REPLICA
+APP --> OBJ
+APP --> CDN
+APP --> KAFKA
+WORKERS --> KAFKA
+WORKERS --> PG_PRIMARY
+MON --> APP
+MON --> DB
+@enduml
